@@ -92,6 +92,14 @@ export default function Login() {
           <Button type="submit" className="w-full h-14 text-lg" disabled={loading}>
             {loading ? 'Entrando...' : 'Entrar no Sistema'}
           </Button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+            className="w-full text-sm text-orange-500 hover:text-orange-400 transition font-medium"
+          >
+            Esqueceu sua senha?
+          </button>
         </form>
 
         <p className="text-center text-zinc-500 text-sm">
