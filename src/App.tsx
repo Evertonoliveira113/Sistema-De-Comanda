@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useInactivityTimeout } from './hooks/useInactivityTimeout';
 import Login from './pages/login/Login';
 import ForgotPassword from './pages/login/ForgotPassword';
 import ResetPassword from './pages/login/ResetPassword';
@@ -15,6 +16,9 @@ import Usuarios from './pages/admin/Usuarios';
 import Relatorios from './pages/admin/Relatorios';
 
 export default function App() {
+  // Configura logout automático após 2 horas de inatividade global
+  useInactivityTimeout(2 * 60 * 60 * 1000);
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
