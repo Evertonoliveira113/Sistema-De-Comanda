@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
 import { comandaService } from '../../services/comandaService';
@@ -35,7 +35,6 @@ export default function ComandaAtiva() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
     if (!id) return;
@@ -560,3 +559,12 @@ export default function ComandaAtiva() {
                 >
                   <div className="bg-purple-100 p-2 rounded-lg text-purple-600 flex-shrink-0"><CreditCard size={20} /></div>
                   <span className="font-bold text-zinc-900 flex-1">Cartão</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}

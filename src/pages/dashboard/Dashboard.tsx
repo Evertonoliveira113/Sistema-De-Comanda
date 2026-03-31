@@ -10,7 +10,6 @@ import {
   Users,
   Clock,
   AlertCircle,
-  Package,
   CreditCard,
   Percent,
   RefreshCw
@@ -23,12 +22,7 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer,
-  Cell,
-  LineChart,
-  Line,
-  PieChart,
-  Pie
+  ResponsiveContainer
 } from 'recharts';
 import { supabase } from '../../services/supabaseClient';
 import { clsx } from 'clsx';
