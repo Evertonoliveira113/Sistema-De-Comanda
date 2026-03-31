@@ -560,16 +560,3 @@ export default function ComandaAtiva() {
                 >
                   <div className="bg-purple-100 p-2 rounded-lg text-purple-600 flex-shrink-0"><CreditCard size={20} /></div>
                   <span className="font-bold text-zinc-900 flex-1">Cartão</span>
-                </button>
-              </div>
-
-              <Button variant="ghost" className="w-full mt-6" onClick={() => setIsClosing(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </Layout>
-  );
-}

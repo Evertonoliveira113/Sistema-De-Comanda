@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Layout } from '../../components/Layout';
 import { useComandas } from '../../hooks/useComandas';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,8 +12,10 @@ import {
   AlertCircle,
   Package,
   CreditCard,
-  Percent
+  Percent,
+  RefreshCw
 } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
 import { 
   BarChart, 
   Bar, 
@@ -43,7 +45,7 @@ export default function Dashboard() {
     totalVendidoHoje: 0,
     ticketMedio: 0,
     comandasFechadasHoje: 0,
-    descotosAplicados: 0,
+    descontosAplicados: 0,
     formasPagamento: [] as any[],
     topProdutos: [] as any[],
     topCategoria: '',
@@ -55,10 +57,11 @@ export default function Dashboard() {
     comandasAbertasAgora: 0,
     comandasFechadasAgora: 0,
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
+  const fetchStats = useCallback(async () => {
+    try {
+        if (!isRefreshing) setIsRefreshing(true);
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
         const hojeISO = hoje.toISOString();
@@ -164,7 +167,7 @@ export default function Dashboard() {
           totalVendidoHoje: totalVendido,
           ticketMedio,
           comandasFechadasHoje: fechadas?.length || 0,
-          descotosAplicados: totalDescontos,
+          descontosAplicados: totalDescontos,
           formasPagamento,
           topProdutos,
           topCategoria: 'Pratos Quentes',
@@ -176,15 +179,38 @@ export default function Dashboard() {
           comandasAbertasAgora,
           comandasFechadasAgora,
         });
-      } catch (error) {
-        console.error('Erro ao buscar estatísticas:', error);
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 60000); // Atualiza a cada minuto
-    return () => clearInterval(interval);
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStats();
+
+    // Configuração do Realtime: Escuta mudanças na tabela 'comandas'
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuta INSERT, UPDATE e DELETE
+          schema: 'public',
+          table: 'comandas'
+        },
+        () => fetchStats() // Re-executa a busca de estatísticas ao detectar mudança
+      )
+      .subscribe();
+
+    // Mantemos um intervalo mais longo apenas como backup de segurança
+    const interval = setInterval(fetchStats, 60000); 
+    
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [fetchStats]);
 
   const kpiCards = [
     { 
@@ -213,11 +239,11 @@ export default function Dashboard() {
     },
     {
       label: 'Descontos',
-      value: formatCurrency(stats.descotosAplicados),
+      value: formatCurrency(stats.descontosAplicados),
       icon: Percent,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      change: stats.descotosAplicados > 0 ? '⚠ Atenção' : 'Sem desconto'
+      change: stats.descontosAplicados > 0 ? '⚠ Atenção' : 'Sem desconto'
     }
   ];
 
@@ -242,11 +268,22 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-4xl font-black text-zinc-900 tracking-tight">Dashboard</h1>
-          <p className="text-zinc-500 font-medium mt-2">
-            {stats.dataAtual.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-black text-zinc-900 tracking-tight">Dashboard</h1>
+            <p className="text-zinc-500 font-medium mt-2">
+              {stats.dataAtual.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={fetchStats} 
+            disabled={isRefreshing}
+            className="w-full md:w-auto shadow-sm"
+          >
+            <RefreshCw size={18} className={cn("mr-2", isRefreshing && "animate-spin")} />
+            {isRefreshing ? 'Atualizando...' : 'Atualizar Dados'}
+          </Button>
         </div>
 
         {/* Comandas Abertas/Fechadas - Destaque */}
