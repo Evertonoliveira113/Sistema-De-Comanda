@@ -134,8 +134,8 @@ export default function ComandaAtiva() {
       setIsAddingItem(false);
       setSearchTerm('');
       fetchData();
-    } catch (error) {
-      setErrorMessage('Erro ao adicionar item');
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Erro ao adicionar item');
     }
   };
 
@@ -145,14 +145,14 @@ export default function ComandaAtiva() {
     if (novaQtd <= 0) {
       try {
         await comandaService.removeItem(item.id, id);
-      } catch (error) {
+      } catch (error: any) {
         setErrorMessage('Erro ao remover item');
       }
     } else {
       try {
         await comandaService.updateItemQuantity(item.id, id, novaQtd, item.preco_unitario);
-      } catch (error) {
-        setErrorMessage('Erro ao atualizar quantidade');
+      } catch (error: any) {
+        setErrorMessage(error.message || 'Erro ao atualizar quantidade');
       }
     }
     fetchData();

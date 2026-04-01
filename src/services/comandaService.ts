@@ -69,14 +69,6 @@ export const comandaService = {
         throw insertError;
       }
     }
-
-    // Atualizar total da comanda
-    try {
-      await this.recalculateTotal(comandaId);
-    } catch (e) {
-      console.error('Erro ao recalcular total após adicionar item:', e);
-      // Não lançamos o erro aqui para não travar a UI se o item foi inserido com sucesso
-    }
   },
 
   async removeItem(itemId: string, comandaId: string) {
@@ -85,7 +77,6 @@ export const comandaService = {
       .delete()
       .eq('id', itemId);
     if (error) throw error;
-    await this.recalculateTotal(comandaId);
   },
 
   async updateItemQuantity(itemId: string, comandaId: string, novaQuantidade: number, precoUnitario: number) {
@@ -95,7 +86,6 @@ export const comandaService = {
       .update({ quantidade: novaQuantidade, subtotal })
       .eq('id', itemId);
     if (error) throw error;
-    await this.recalculateTotal(comandaId);
   },
 
   async updateDiscount(comandaId: string, desconto: number) {
@@ -105,35 +95,6 @@ export const comandaService = {
       .eq('id', comandaId);
     
     if (error) throw error;
-    await this.recalculateTotal(comandaId);
-  },
-
-  async recalculateTotal(comandaId: string) {
-    const { data: comanda, error: comandaError } = await supabase
-      .from('comandas')
-      .select('desconto')
-      .eq('id', comandaId)
-      .single();
-    
-    // Se der erro ao buscar desconto (ex: coluna não existe), assume 0
-    const currentDiscount = comandaError ? 0 : (comanda?.desconto || 0);
-
-    const { data: items, error: itemsError } = await supabase
-      .from('comanda_itens')
-      .select('subtotal')
-      .eq('comanda_id', comandaId);
-    
-    if (itemsError) throw itemsError;
-
-    const subtotal = items.reduce((acc, item) => acc + Number(item.subtotal), 0);
-    const total = Math.max(0, subtotal - currentDiscount);
-
-    const { error: updateError } = await supabase
-      .from('comandas')
-      .update({ total })
-      .eq('id', comandaId);
-    
-    if (updateError) throw updateError;
   },
 
   async closeComanda(comandaId: string, pagamento: Partial<Payment>) {
