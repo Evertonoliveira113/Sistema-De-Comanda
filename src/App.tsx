@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useInactivityTimeout } from './hooks/useInactivityTimeout';
+import { useAuth } from './hooks/useAuth';
 import Login from './pages/login/Login';
 import ForgotPassword from './pages/login/ForgotPassword';
 import ResetPassword from './pages/login/ResetPassword';
@@ -14,6 +15,27 @@ import Categorias from './pages/categorias/Categorias';
 import Estoque from './pages/admin/Estoque';
 import Usuarios from './pages/admin/Usuarios';
 import Relatorios from './pages/admin/Relatorios';
+
+// Componente para redirecionamento baseado no role
+function RoleBasedRedirect() {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-zinc-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirecionar baseado no role
+  const redirectPath = profile?.role === 'admin' ? '/dashboard' : '/comandas';
+  return <Navigate to={redirectPath} replace />;
+}
 
 export default function App() {
   // Configura logout automático após 2 horas de inatividade global
@@ -85,7 +107,7 @@ export default function App() {
           } />
 
           {/* Fallback */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<RoleBasedRedirect />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

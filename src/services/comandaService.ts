@@ -5,7 +5,7 @@ export const comandaService = {
   async getActiveComandas() {
     const { data, error } = await supabase
       .from('comandas')
-      .select('*')
+      .select('*, usuario:usuarios(nome)')
       .eq('status', 'aberta')
       .order('numero_comanda');
     if (error) throw error;
@@ -31,7 +31,31 @@ export const comandaService = {
     return data[0] as Comanda;
   },
 
+  async isNumeroComandaTaken(numero: number) {
+    const { data, error } = await supabase
+      .from('comandas')
+      .select('id')
+      .eq('numero_comanda', numero)
+      .eq('status', 'aberta')
+      .limit(1);
+    if (error) throw error;
+    return Array.isArray(data) && data.length > 0;
+  },
+
   async addItem(comandaId: string, produtoId: string, quantidade: number, precoUnitario: number) {
+    // Verificar se o produto está ativo
+    const { data: produto, error: produtoError } = await supabase
+      .from('produtos')
+      .select('ativo')
+      .eq('id', produtoId)
+      .single();
+
+    if (produtoError) throw produtoError;
+
+    if (!produto.ativo) {
+      throw new Error('Produto inativo');
+    }
+
     // Verificar se o produto já existe nesta comanda
     const { data: existingItems, error: checkError } = await supabase
       .from('comanda_itens')
@@ -129,7 +153,10 @@ export const comandaService = {
   async cancelComanda(comandaId: string) {
     const { error } = await supabase
       .from('comandas')
-      .update({ status: 'cancelada' })
+      .update({ 
+        status: 'cancelada',
+        data_fechamento: new Date().toISOString()
+      })
       .eq('id', comandaId);
     if (error) throw error;
   },

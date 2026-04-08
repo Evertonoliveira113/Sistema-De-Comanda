@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { Button } from '../../components/ui/Button';
 import { Flame, Mail, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,6 +12,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { profile } = useAuth();
+
+  useEffect(() => {
+    // Redirecionar automaticamente baseado no role quando o profile estiver disponível
+    if (profile) {
+      const redirectPath = profile.role === 'admin' ? '/dashboard' : '/comandas';
+      navigate(redirectPath);
+    }
+  }, [profile, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +34,7 @@ export default function Login() {
       });
 
       if (error) throw error;
-      navigate('/dashboard');
+      // O redirecionamento será feito pelo useEffect quando o profile for carregado
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
     } finally {

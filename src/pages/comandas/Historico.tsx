@@ -26,6 +26,7 @@ export default function Historico() {
           usuario:usuarios(nome),
           pagamentos(forma_pagamento, valor)
         `)
+        .neq('status', 'aberta')  // Excluir comandas abertas do histórico
         .order('data_fechamento', { ascending: false, nullsFirst: false });
 
       // Filtro por status
@@ -35,13 +36,14 @@ export default function Historico() {
       
       // Filtro por data (usando data_fechamento para histórico)
       if (filters.data) {
-        const selectedDate = new Date(filters.data);
-        const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0);
-        const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59);
+        // Criar intervalo do dia selecionado no timezone local
+        const [year, month, day] = filters.data.split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
         
         query = query
-          .gte('data_fechamento', start.toISOString())
-          .lte('data_fechamento', end.toISOString());
+          .gte('data_fechamento', startOfDay.toISOString())
+          .lte('data_fechamento', endOfDay.toISOString());
       }
 
       const { data, error } = await query;

@@ -19,6 +19,7 @@ export default function Produtos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [lastQuantidadeMinima, setLastQuantidadeMinima] = useState<number>(5); // Valor padrão inicial
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -39,6 +40,19 @@ export default function Produtos() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Tem certeza que deseja excluir "${product.nome}"? Esta ação não pode ser desfeita.`)) return;
+    
+    try {
+      await produtoService.deleteProduct(product.id);
+      fetchData();
+      alert('Produto excluído com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao excluir produto:', error);
+      setErrorMessage(error.message || 'Erro ao excluir produto');
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +84,10 @@ export default function Produtos() {
             <h1 className="text-3xl font-black text-zinc-900 tracking-tight">Produtos</h1>
             <p className="text-zinc-500 font-medium">Gerencie o cardápio do restaurante.</p>
           </div>
-          <Button onClick={() => { setEditingProduct({}); setIsModalOpen(true); }}>
+          <Button onClick={() => { 
+            setEditingProduct({ quantidade_minima: lastQuantidadeMinima }); 
+            setIsModalOpen(true); 
+          }}>
             <Plus size={20} className="mr-2" />
             Novo Produto
           </Button>
@@ -132,13 +149,23 @@ export default function Produtos() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => { setEditingProduct(product); setIsModalOpen(true); }}
-                      >
-                        <Edit2 size={18} />
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => { setEditingProduct(product); setIsModalOpen(true); }}
+                        >
+                          <Edit2 size={18} />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-red-500 hover:bg-red-50"
+                          onClick={() => handleDelete(product)}
+                        >
+                          <Trash2 size={18} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -200,7 +227,11 @@ export default function Produtos() {
                     type="number"
                     required
                     value={editingProduct?.quantidade_minima || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, quantidade_minima: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      setEditingProduct({ ...editingProduct, quantidade_minima: value });
+                      setLastQuantidadeMinima(value);
+                    }}
                     className="w-full bg-zinc-50 border border-zinc-200 h-12 px-4 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
                     placeholder="Ex: 5"
                   />

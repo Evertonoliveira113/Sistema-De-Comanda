@@ -22,18 +22,27 @@ export default function Comandas() {
   const handleOpenComanda = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
+    const numeroDigitado = Number(newComanda.numero);
+    if (!newComanda.numero.trim() || Number.isNaN(numeroDigitado) || numeroDigitado <= 0) {
+      alert('Informe um número de comanda válido.');
+      return;
+    }
+
     try {
-      await comandaService.openComanda(
-        parseInt(newComanda.numero), 
-        user.id
-      );
+      const jaExiste = await comandaService.isNumeroComandaTaken(numeroDigitado);
+      if (jaExiste) {
+        alert('Já existe uma comanda com este número!');
+        return;
+      }
+
+      await comandaService.openComanda(numeroDigitado, user.id);
       setIsModalOpen(false);
       setNewComanda({ numero: '' });
       refresh();
     } catch (error: any) {
       if (error.message?.includes('unique')) {
-        alert('Já existe uma comanda aberta com este número!');
+        alert('Já existe uma comanda com este número!');
       } else {
         alert('Erro ao abrir comanda');
       }
@@ -106,7 +115,7 @@ export default function Comandas() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
                     <User size={12} />
-                    <span>Garçom: Everton</span>
+                    <span>Garçom: {comanda.usuario?.nome || 'Não informado'}</span>
                   </div>
                 </div>
 

@@ -89,5 +89,17 @@ export const produtoService = {
     }
 
     return data[0];
+  },
+
+  async deleteProduct(id: string) {
+    const { error } = await supabase
+      .from('produtos')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Erro ao excluir produto:', error);
+      throw error;
+    }
   }
 };

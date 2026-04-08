@@ -1,7 +1,17 @@
 -- Função para sincronizar o estoque automaticamente com base nos itens da comanda
--- 1. Função que valida estoque, atualiza estoque e recalcula o total da comanda
+-- 1. LIMPEZA TOTAL DE CONFLITOS
+-- Removemos gatilhos antigos que podem estar causando subtração duplicada
+DROP TRIGGER IF EXISTS trg_baixar_estoque ON public.comanda_itens;
+DROP TRIGGER IF EXISTS tr_sincronizar_estoque ON public.comanda_itens;
+DROP TRIGGER IF EXISTS tr_sincronizar_estoque_delete ON public.comanda_itens;
+DROP TRIGGER IF EXISTS trg_gerenciar_item_comanda ON public.comanda_itens;
+DROP FUNCTION IF EXISTS public.baixar_estoque_item();
+DROP FUNCTION IF EXISTS public.proc_gerenciar_item_comanda();
+
+-- 2. FUNÇÃO UNIFICADA
+-- Gerencia validação, baixa de estoque e cálculo de total em uma única operação
 CREATE OR REPLACE FUNCTION public.proc_gerenciar_item_comanda()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS $func$
 DECLARE
     v_estoque_atual INTEGER;
     v_comanda_id UUID;
@@ -10,18 +20,18 @@ DECLARE
 BEGIN
     v_comanda_id := COALESCE(NEW.comanda_id, OLD.comanda_id);
 
-    -- VALIDAÇÃO DE ESTOQUE (Apenas para Inserção ou Aumento de quantidade)
+    -- A. VALIDAÇÃO DE ESTOQUE
     IF (TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.quantidade > OLD.quantidade)) THEN
         SELECT quantidade_atual INTO v_estoque_atual 
         FROM public.estoque WHERE produto_id = NEW.produto_id;
 
         IF (TG_OP = 'INSERT' AND v_estoque_atual < NEW.quantidade) OR 
            (TG_OP = 'UPDATE' AND v_estoque_atual < (NEW.quantidade - OLD.quantidade)) THEN
-            RAISE EXCEPTION 'Estoque insuficiente para este produto. Disponível: %', v_estoque_atual;
+            RAISE EXCEPTION 'Estoque insuficiente! Disponível: %', v_estoque_atual;
         END IF;
     END IF;
 
-    -- ATUALIZAÇÃO DO ESTOQUE
+    -- B. MOVIMENTAÇÃO DE ESTOQUE
     IF (TG_OP = 'INSERT') THEN
         UPDATE public.estoque
         SET quantidade_atual = quantidade_atual - NEW.quantidade
@@ -36,7 +46,15 @@ BEGIN
         WHERE produto_id = OLD.produto_id;
     END IF;
 
-    -- ATUALIZAÇÃO AUTOMÁTICA DO TOTAL (Reduz latência no App)
+    -- D. INATIVAR PRODUTO SE ESTOQUE ZEROU
+    UPDATE public.produtos
+    SET ativo = false
+    WHERE id IN (
+        SELECT produto_id FROM public.estoque 
+        WHERE quantidade_atual <= 0
+    );
+
+    -- C. RECALCULO DO TOTAL DA COMANDA
     SELECT COALESCE(SUM(subtotal), 0) INTO v_subtotal_itens 
     FROM public.comanda_itens 
     WHERE comanda_id = v_comanda_id;
@@ -49,12 +67,11 @@ BEGIN
     SET total = GREATEST(0, v_subtotal_itens - v_desconto_atual)
     WHERE id = v_comanda_id;
 
-    RETURN NULL;
+    RETURN COALESCE(NEW, OLD);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$func$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Criar o Trigger unificado
-DROP TRIGGER IF EXISTS trg_gerenciar_item_comanda ON public.comanda_itens;
+-- 3. CRIAÇÃO DO TRIGGER
 CREATE TRIGGER trg_gerenciar_item_comanda
 AFTER INSERT OR UPDATE OR DELETE ON public.comanda_itens
 FOR EACH ROW EXECUTE FUNCTION public.proc_gerenciar_item_comanda();

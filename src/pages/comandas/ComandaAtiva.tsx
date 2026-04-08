@@ -34,6 +34,8 @@ export default function ComandaAtiva() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [amountReceived, setAmountReceived] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -158,6 +160,10 @@ export default function ComandaAtiva() {
     fetchData();
   };
 
+  const amountPaid = Number(amountReceived.replace(',', '.')) || 0;
+  const changeAmount = amountPaid > comanda?.total ? amountPaid - comanda.total : 0;
+  const canConfirmCash = selectedPaymentMethod === 'Dinheiro' && amountPaid >= (comanda?.total || 0);
+
   const handleCloseComanda = async (metodo: PaymentMethod) => {
     if (!id || !comanda) return;
     if (profile?.role !== 'admin') {
@@ -169,10 +175,20 @@ export default function ComandaAtiva() {
         valor: comanda.total,
         forma_pagamento: metodo
       });
+      setSelectedPaymentMethod(null);
+      setAmountReceived('');
       navigate('/comandas');
     } catch (error) {
       setErrorMessage('Erro ao fechar comanda. Verifique se a tabela de pagamentos existe.');
     }
+  };
+
+  const handleConfirmCash = async () => {
+    if (!canConfirmCash) {
+      setErrorMessage('Informe um valor recebido igual ou superior ao total.');
+      return;
+    }
+    await handleCloseComanda('Dinheiro');
   };
 
   const handleApplyDiscount = async () => {
@@ -193,8 +209,16 @@ export default function ComandaAtiva() {
   if (loading) return <Layout><div className="animate-pulse space-y-4"><div className="h-12 bg-zinc-200 rounded-xl w-1/4"></div><div className="h-64 bg-zinc-200 rounded-3xl"></div></div></Layout>;
 
   const filteredProducts = products.filter(p => 
-    p.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    p.nome.toLowerCase().includes(searchTerm.toLowerCase()) && p.ativo
   );
+
+  // Agrupar produtos por categoria para exibição organizada
+  const groupedProducts = filteredProducts.reduce((acc, product) => {
+    const categoryName = product.categoria?.nome || 'Geral';
+    if (!acc[categoryName]) acc[categoryName] = [];
+    acc[categoryName].push(product);
+    return acc;
+  }, {} as Record<string, Product[]>);
 
   return (
     <Layout>
@@ -474,26 +498,35 @@ export default function ComandaAtiva() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
+              <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-6">
                 {filteredProducts.length === 0 ? (
-                  <div className="col-span-full text-center py-12 text-zinc-400">
+                  <div className="text-center py-12 text-zinc-400">
                     Nenhum produto encontrado
                   </div>
                 ) : (
-                  filteredProducts.map(product => (
-                    <button
-                      key={product.id}
-                      onClick={() => handleAddItem(product)}
-                      className="flex items-center justify-between p-3 md:p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-orange-500 hover:bg-orange-50 active:scale-95 transition-all text-left"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-zinc-900 text-sm md:text-base line-clamp-2">{product.nome}</h4>
-                        <p className="text-sm md:text-base text-orange-600 font-bold">{formatCurrency(product.preco)}</p>
+                  Object.entries(groupedProducts).map(([category, items]) => (
+                    <div key={category} className="space-y-3">
+                      <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-1">
+                        {category}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
+                        {items.map(product => (
+                          <button
+                            key={product.id}
+                            onClick={() => handleAddItem(product)}
+                            className="flex items-center justify-between p-3 md:p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-orange-500 hover:bg-orange-50 active:scale-95 transition-all text-left"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-bold text-zinc-900 text-sm md:text-base line-clamp-2">{product.nome}</h4>
+                              <p className="text-sm md:text-base text-orange-600 font-bold">{formatCurrency(product.preco)}</p>
+                            </div>
+                            <div className="bg-orange-100 p-2 rounded-lg shadow-sm flex-shrink-0">
+                              <Plus size={18} className="text-orange-600" />
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                      <div className="bg-orange-100 p-2 rounded-lg shadow-sm flex-shrink-0">
-                        <Plus size={18} className="text-orange-600" />
-                      </div>
-                    </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -530,17 +563,29 @@ export default function ComandaAtiva() {
         {isClosing && (
           <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm no-print">
             <div className="bg-white w-full max-w-md rounded-[32px] p-6 md:p-8 shadow-2xl">
-              <div className="text-center mb-8">
+              <div className="relative text-center mb-8">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsClosing(false);
+                    setSelectedPaymentMethod(null);
+                    setAmountReceived('');
+                  }}
+                  className="absolute right-0 top-0 p-3 rounded-full text-zinc-500 hover:bg-zinc-100"
+                >
+                  X
+                </button>
                 <div className="w-16 md:w-20 h-16 md:h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CreditCard size={32} className="text-orange-600" />
                 </div>
                 <h2 className="text-xl md:text-2xl font-black text-zinc-900">Fechar Comanda</h2>
+                <p className="text-xs md:text-sm text-zinc-500 font-medium mt-2">Escolha o pagamento ou volte para lançar produtos.</p>
                 <p className="text-xs md:text-sm text-zinc-500 font-medium mt-2">Total: <span className="text-orange-600 font-black text-lg md:text-2xl">{formatCurrency(comanda.total)}</span></p>
               </div>
 
               <div className="grid grid-cols-1 gap-3">
                 <button 
-                  onClick={() => handleCloseComanda('Dinheiro')}
+                  onClick={() => setSelectedPaymentMethod('Dinheiro')}
                   className="flex items-center gap-3 p-4 bg-zinc-50 rounded-2xl border border-zinc-100 hover:border-orange-500 active:scale-95 transition-all"
                 >
                   <div className="bg-emerald-100 p-2 rounded-lg text-emerald-600 flex-shrink-0"><Banknote size={20} /></div>
@@ -561,6 +606,34 @@ export default function ComandaAtiva() {
                   <span className="font-bold text-zinc-900 flex-1">Cartão</span>
                 </button>
               </div>
+
+              {selectedPaymentMethod === 'Dinheiro' && (
+                <div className="mt-4 space-y-4 p-4 bg-zinc-50 rounded-3xl border border-zinc-100">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Valor recebido</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={amountReceived}
+                      onChange={(e) => setAmountReceived(e.target.value)}
+                      className="w-full bg-white border border-zinc-200 h-12 px-4 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
+                      placeholder="R$ 0,00"
+                    />
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-zinc-700">
+                    <span>Total</span>
+                    <span>{formatCurrency(comanda.total)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-green-700">
+                    <span>Troco</span>
+                    <span>{formatCurrency(changeAmount)}</span>
+                  </div>
+                  <Button disabled={!canConfirmCash} onClick={handleConfirmCash}>
+                    Confirmar pagamento em dinheiro
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
