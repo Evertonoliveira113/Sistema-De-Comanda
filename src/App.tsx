@@ -82,12 +82,6 @@ export default function App() {
             </ProtectedRoute>
           } />
 
-          <Route path="/categorias" element={
-            <ProtectedRoute adminOnly>
-              <Categorias />
-            </ProtectedRoute>
-          } />
-
           <Route path="/estoque" element={
             <ProtectedRoute adminOnly>
               <Estoque />

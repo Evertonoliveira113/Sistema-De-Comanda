@@ -13,7 +13,7 @@ export default function Comandas() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newComanda, setNewComanda] = useState({ numero: '' });
+  const [newComanda, setNewComanda] = useState({ numero: '', tipo: 'local' as 'local' | 'retirada' });
 
   const filteredComandas = comandas.filter(c => 
     c.numero_comanda.toString().includes(searchTerm)
@@ -29,6 +29,11 @@ export default function Comandas() {
       return;
     }
 
+    if (!newComanda.tipo) {
+      alert('Selecione se a comanda é Local ou Retirada.');
+      return;
+    }
+
     try {
       const jaExiste = await comandaService.isNumeroComandaTaken(numeroDigitado);
       if (jaExiste) {
@@ -36,9 +41,9 @@ export default function Comandas() {
         return;
       }
 
-      await comandaService.openComanda(numeroDigitado, user.id);
+      await comandaService.openComanda(numeroDigitado, user.id, newComanda.tipo);
       setIsModalOpen(false);
-      setNewComanda({ numero: '' });
+      setNewComanda({ numero: '', tipo: 'local' });
       refresh();
     } catch (error: any) {
       if (error.message?.includes('unique')) {
@@ -134,6 +139,26 @@ export default function Comandas() {
               <h2 className="text-2xl font-black text-zinc-900 mb-6">Abrir Nova Comanda</h2>
               <form onSubmit={handleOpenComanda} className="space-y-6">
                 <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Tipo de Comanda</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['local', 'retirada'] as const).map((tipo) => (
+                      <button
+                        type="button"
+                        key={tipo}
+                        onClick={() => setNewComanda({ ...newComanda, tipo })}
+                        className={`h-14 rounded-2xl border text-sm font-bold transition ${
+                          newComanda.tipo === tipo
+                            ? 'bg-orange-600 text-white border-orange-600'
+                            : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {tipo === 'local' ? 'Local' : 'Retirada'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Número da Comanda</label>
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
@@ -147,6 +172,7 @@ export default function Comandas() {
                     />
                   </div>
                 </div>
+
                 <div className="flex gap-3 pt-4">
                   <Button type="button" variant="ghost" className="flex-1" onClick={() => setIsModalOpen(false)}>
                     Cancelar

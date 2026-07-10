@@ -22,13 +22,20 @@ export const comandaService = {
     return data;
   },
 
-  async openComanda(numero: number, userId: string) {
+  async openComanda(numero_comanda: number, usuario_id: string, tipo_comanda: 'local' | 'retirada') {
     const { data, error } = await supabase
       .from('comandas')
-      .insert([{ numero_comanda: numero, usuario_id: userId }])
-      .select();
+      .insert([{
+        numero_comanda,
+        usuario_id,
+        tipo_comanda,
+        status: 'aberta',
+        data_abertura: new Date().toISOString()
+      }])
+      .single();
+
     if (error) throw error;
-    return data[0] as Comanda;
+    return data;
   },
 
   async isNumeroComandaTaken(numero: number) {

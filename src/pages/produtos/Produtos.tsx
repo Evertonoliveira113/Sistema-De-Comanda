@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../../components/Layout';
 import { produtoService } from '../../services/produtoService';
+import { estoqueService } from '../../services/estoqueService';
+import { supabase } from '../../services/supabaseClient';
 import { Product, Category } from '../../types/database.types';
 import { Button } from '../../components/ui/Button';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { Plus, Search, Edit2, Trash2, Package, XCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Package, XCircle, Tags } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,23 +17,30 @@ function cn(...inputs: any[]) {
 export default function Produtos() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
-  const [lastQuantidadeMinima, setLastQuantidadeMinima] = useState<number>(5); // Valor padrão inicial
+  const [editingStock, setEditingStock] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [newCategory, setNewCategory] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
-      const [p, c] = await Promise.all([
+      const [p, c, i] = await Promise.all([
         produtoService.getProducts(),
-        produtoService.getCategories()
+        produtoService.getCategories(),
+        estoqueService.getInventory()
       ]);
+
       setProducts(p);
       setCategories(c);
+      setInventory(i);
     } catch (error) {
       console.error(error);
+      setErrorMessage('Erro ao carregar dados de produtos.');
     } finally {
       setLoading(false);
     }
@@ -42,8 +51,8 @@ export default function Produtos() {
   }, []);
 
   const handleDelete = async (product: Product) => {
-    if (!confirm(`Tem certeza que deseja excluir "${product.nome}"? Esta ação não pode ser desfeita.`)) return;
-    
+    if (!confirm(`Tem certeza que deseja excluir "${product.nome}"?`)) return;
+
     try {
       await produtoService.deleteProduct(product.id);
       fetchData();
@@ -58,13 +67,18 @@ export default function Produtos() {
     e.preventDefault();
     try {
       setErrorMessage(null);
-      if (editingProduct?.id) {
-        await produtoService.updateProduct(editingProduct.id, editingProduct);
-      } else {
-        await produtoService.createProduct(editingProduct!);
+
+      const savedProduct = editingProduct?.id
+        ? await produtoService.updateProduct(editingProduct.id, editingProduct)
+        : await produtoService.createProduct(editingProduct!);
+
+      if (savedProduct?.id) {
+        await estoqueService.updateStock(savedProduct.id, Number(editingStock));
       }
+
       setIsModalOpen(false);
       setEditingProduct(null);
+      setEditingStock(0);
       fetchData();
     } catch (error: any) {
       console.error('Erro ao salvar produto:', error);
@@ -72,7 +86,84 @@ export default function Produtos() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nome = newCategory.trim();
+
+    if (!nome) {
+      setErrorMessage('Informe o nome da categoria.');
+      return;
+    }
+
+    try {
+      if (editingCategoryId) {
+        await supabase
+          .from('categorias')
+          .update({ nome })
+          .eq('id', editingCategoryId);
+      } else {
+        await supabase.from('categorias').insert([{ nome }]);
+      }
+
+      setNewCategory('');
+      setEditingCategoryId(null);
+      setErrorMessage(null);
+      await fetchData();
+    } catch (error) {
+      console.error(error);
+      setErrorMessage('Erro ao salvar categoria.');
+    }
+  };
+
+  const startEditCategory = (category: Category) => {
+    setEditingCategoryId(category.id);
+    setNewCategory(category.nome);
+  };
+
+  const cancelEditCategory = () => {
+    setEditingCategoryId(null);
+    setNewCategory('');
+  };
+
+  const handleDeleteCategory = async (category: Category) => {
+    const hasProducts = products.some(product => product.categoria_id === category.id);
+
+    if (hasProducts) {
+      setErrorMessage('Não é possível excluir uma categoria com produtos vinculados.');
+      return;
+    }
+
+    if (!confirm(`Deseja excluir a categoria "${category.nome}"?`)) return;
+
+    try {
+      await supabase.from('categorias').delete().eq('id', category.id);
+      setEditingCategoryId(null);
+      setNewCategory('');
+      setErrorMessage(null);
+      await fetchData();
+    } catch (error) {
+      console.error(error);
+      setErrorMessage('Erro ao excluir categoria.');
+    }
+  };
+
+  const openCreateModal = () => {
+    setEditingProduct({ ativo: true, quantidade_minima: 5 });
+    setEditingStock(0);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (product: Product) => {
+    const stockItem = inventory.find(item => item.produto_id === product.id);
+    setEditingProduct({
+      ...product,
+      quantidade_minima: product.quantidade_minima ?? stockItem?.quantidade_minima ?? 0
+    });
+    setEditingStock(stockItem?.quantidade_atual ?? 0);
+    setIsModalOpen(true);
+  };
+
+  const filteredProducts = products.filter(p =>
     p.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -82,12 +173,10 @@ export default function Produtos() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-zinc-900 tracking-tight">Produtos</h1>
-            <p className="text-zinc-500 font-medium">Gerencie o cardápio do restaurante.</p>
+            <p className="text-zinc-500 font-medium">Gerencie produtos, categorias e estoque em um só lugar.</p>
           </div>
-          <Button onClick={() => { 
-            setEditingProduct({ quantidade_minima: lastQuantidadeMinima }); 
-            setIsModalOpen(true); 
-          }}>
+
+          <Button onClick={openCreateModal}>
             <Plus size={20} className="mr-2" />
             Novo Produto
           </Button>
@@ -111,76 +200,178 @@ export default function Produtos() {
           </div>
         )}
 
-        <div className="bg-white rounded-[32px] border border-zinc-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-zinc-50 border-b border-zinc-100">
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Produto</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Categoria</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Preço</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
-                {filteredProducts.map(product => (
-                  <tr key={product.id} className="hover:bg-zinc-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-zinc-100 p-2 rounded-lg text-zinc-500">
-                          <Package size={20} />
-                        </div>
-                        <span className="font-bold text-zinc-900">{product.nome}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-zinc-500">{product.categoria?.nome}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-orange-600">{formatCurrency(product.preco)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
-                        product.ativo ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
-                      )}>
-                        {product.ativo ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => { setEditingProduct(product); setIsModalOpen(true); }}
-                        >
-                          <Edit2 size={18} />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-red-500 hover:bg-red-50"
-                          onClick={() => handleDelete(product)}
-                        >
-                          <Trash2 size={18} />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
+          <div className="space-y-6">
+            <div className="bg-white rounded-[32px] border border-zinc-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-zinc-100">
+                <h2 className="text-lg font-black text-zinc-900">Produtos</h2>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 border-b border-zinc-100">
+                      <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Produto</th>
+                      <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Estoque Atual</th>
+                      <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Categoria</th>
+                      <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Preço</th>
+                      <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">Status</th>
+                      <th className="px-6 py-4 text-xs font-bold text-zinc-500 uppercase tracking-widest text-right">Ações</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-zinc-50">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-zinc-400">
+                          Carregando...
+                        </td>
+                      </tr>
+                    ) : filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-zinc-400">
+                          Nenhum produto encontrado.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredProducts.map(product => (
+                        <tr key={product.id} className="hover:bg-zinc-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-zinc-100 p-2 rounded-lg text-zinc-500">
+                                <Package size={20} />
+                              </div>
+                              <div>
+                                <div className="font-bold text-zinc-900">{product.nome}</div>
+                                <div className="text-xs text-zinc-500">
+                                  Min: {inventory.find(item => item.produto_id === product.id)?.quantidade_minima ?? product.quantidade_minima ?? 0}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className="font-semibold text-zinc-700">
+                              {inventory.find(item => item.produto_id === product.id)?.quantidade_atual ?? 0}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-medium text-zinc-500">
+                              {product.categoria?.nome || 'Sem categoria'}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-orange-600">{formatCurrency(product.preco)}</span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className={cn(
+                              "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg",
+                              product.ativo ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                            )}>
+                              {product.ativo ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => openEditModal(product)}>
+                                <Edit2 size={18} />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-red-500 hover:bg-red-50"
+                                onClick={() => handleDelete(product)}
+                              >
+                                <Trash2 size={18} />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white rounded-[32px] border border-zinc-100 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-orange-50 p-3 rounded-2xl text-orange-600">
+                  <Tags size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-zinc-900">Categorias</h2>
+                  <p className="text-sm text-zinc-500">Organize o cardápio por grupo</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveCategory} className="flex flex-col gap-3 mb-4">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder={editingCategoryId ? 'Editar categoria' : 'Nova categoria'}
+                  className="w-full bg-zinc-50 border border-zinc-200 h-12 px-4 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
+                />
+
+                <div className="flex gap-2">
+                  <Button type="submit">
+                    {editingCategoryId ? 'Salvar' : 'Adicionar'}
+                  </Button>
+
+                  {editingCategoryId && (
+                    <Button type="button" variant="ghost" onClick={cancelEditCategory}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              </form>
+
+              <div className="space-y-2">
+                {categories.map(category => (
+                  <div key={category.id} className="flex items-center justify-between bg-zinc-50 px-3 py-2 rounded-xl">
+                    <span className="font-medium text-zinc-700">{category.nome}</span>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => startEditCategory(category)}
+                      >
+                        <Edit2 size={16} />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:bg-red-50"
+                        onClick={() => handleDeleteCategory(category)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Modal Produto */}
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm">
             <div className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl">
               <h2 className="text-2xl font-black text-zinc-900 mb-6">
                 {editingProduct?.id ? 'Editar Produto' : 'Novo Produto'}
               </h2>
+
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Nome do Produto</label>
@@ -193,6 +384,7 @@ export default function Produtos() {
                     placeholder="Ex: Picanha na Brasa"
                   />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Preço (R$)</label>
@@ -200,12 +392,13 @@ export default function Produtos() {
                       type="number"
                       step="0.01"
                       required
-                      value={editingProduct?.preco || ''}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, preco: parseFloat(e.target.value) })}
+                      value={editingProduct?.preco ?? ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, preco: Number(e.target.value) || 0 })}
                       className="w-full bg-zinc-50 border border-zinc-200 h-12 px-4 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
                       placeholder="0,00"
                     />
                   </div>
+
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Categoria</label>
                     <select
@@ -221,21 +414,32 @@ export default function Produtos() {
                     </select>
                   </div>
                 </div>
+
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Estoque Mínimo</label>
                   <input
                     type="number"
                     required
-                    value={editingProduct?.quantidade_minima || ''}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value) || 0;
-                      setEditingProduct({ ...editingProduct, quantidade_minima: value });
-                      setLastQuantidadeMinima(value);
-                    }}
+                    value={editingProduct?.quantidade_minima ?? 0}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      quantidade_minima: Number(e.target.value) || 0
+                    })}
                     className="w-full bg-zinc-50 border border-zinc-200 h-12 px-4 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Ex: 5"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Estoque Atual</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingStock}
+                    onChange={(e) => setEditingStock(Number(e.target.value) || 0)}
+                    className="w-full bg-zinc-50 border border-zinc-200 h-12 px-4 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+
                 <div className="flex items-center gap-2 py-2">
                   <input
                     type="checkbox"
@@ -246,6 +450,7 @@ export default function Produtos() {
                   />
                   <label htmlFor="ativo" className="text-sm font-bold text-zinc-700">Produto Ativo</label>
                 </div>
+
                 <div className="flex gap-3 pt-4">
                   <Button type="button" variant="ghost" className="flex-1" onClick={() => setIsModalOpen(false)}>
                     Cancelar

@@ -208,6 +208,10 @@ export default function ComandaAtiva() {
 
   if (loading) return <Layout><div className="animate-pulse space-y-4"><div className="h-12 bg-zinc-200 rounded-xl w-1/4"></div><div className="h-64 bg-zinc-200 rounded-3xl"></div></div></Layout>;
 
+  const comandaTipo = comanda?.tipo || comanda?.tipo_comanda || 'local';
+  const comandaTipoLabel = comandaTipo === 'retirada' ? 'Retirada' : 'Local';
+  const comandaGarcom = comanda?.usuario?.nome || profile?.nome || 'N/A';
+
   const filteredProducts = products.filter(p => 
     p.nome.toLowerCase().includes(searchTerm.toLowerCase()) && p.ativo
   );
@@ -250,6 +254,7 @@ export default function ComandaAtiva() {
             <div>
               <h1 className="text-xl md:text-2xl font-black text-zinc-900">Comanda #{comanda.numero_comanda}</h1>
               <p className="text-xs md:text-sm text-zinc-500 font-medium">Status: {comanda.status}</p>
+              <p className="text-xs md:text-sm text-zinc-500 font-medium">Tipo: {comandaTipoLabel}</p>
             </div>
           </div>
           <div className="flex gap-2 no-print">
@@ -280,6 +285,10 @@ export default function ComandaAtiva() {
             <p>Comanda Nº {comanda.numero_comanda}</p>
             <p>Garçom: {comanda.usuario?.nome || profile?.nome}</p>
           </div>
+          <div className="mb-2 text-xs">
+            <div>Tipo: {comandaTipoLabel}</div>
+            <div>Data: {new Date(comanda.data_abertura).toLocaleDateString('pt-BR')}</div>
+          </div>
           <div className="mb-2">
             <p className="font-bold">ITENS:</p>
             {comanda.comanda_itens.map((item: any) => (
@@ -289,16 +298,40 @@ export default function ComandaAtiva() {
               </div>
             ))}
           </div>
-          {comanda.desconto > 0 && (
-            <div className="flex justify-between text-sm mb-2">
-              <span>DESCONTO:</span>
-              <span>-{formatCurrency(comanda.desconto)}</span>
-            </div>
-          )}
-          <div className="border-t border-dashed border-black pt-2 font-bold flex justify-between">
-            <span>TOTAL:</span>
-            <span>{formatCurrency(comanda.total)}</span>
-          </div>
+          
+          {/* CÁLCULOS PARA TAXA DE SERVIÇO */}
+          {(() => {
+            const subtotal = comanda.comanda_itens.reduce((acc: number, i: any) => acc + Number(i.subtotal), 0);
+            const desconto = comanda.desconto || 0;
+            const totalAntesTaxa = subtotal - desconto;
+            const taxaServico = totalAntesTaxa * 0.10;
+            const totalComTaxa = totalAntesTaxa + taxaServico;
+
+            return (
+              <>
+                {desconto > 0 && (
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>DESCONTO:</span>
+                    <span>-{formatCurrency(desconto)}</span>
+                  </div>
+                )}
+              
+                <div className="border-t border-dashed border-black pt-2 font-bold flex justify-between">
+                  <span>TOTAL:</span>
+                  <span>{formatCurrency(totalAntesTaxa)}</span>
+                </div> 
+                 <div className="flex justify-between text-sm mb-2 border-t border-dashed border-black pt-2">
+                  <span>TAXA SERVIÇO (10%):</span>
+                  <span>{formatCurrency(taxaServico)}</span>
+                </div>
+                <div className="border-t border-dashed border-black pt-2 font-bold flex justify-between">
+                  <span>TOTAL COM TAXA:</span>
+                  <span>{formatCurrency(totalComTaxa)}</span>
+                </div>
+              </>
+            );
+          })()}
+          
           <div className="text-center mt-4 text-[10pt]">
             <p>Data: {new Date(comanda.data_abertura).toLocaleDateString()}</p>
             <p>Obrigado pela preferência!</p>

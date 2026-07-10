@@ -2,19 +2,25 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Sistema de Comandas
 
-This contains everything you need to run your app locally.
+Aplicação de gestão de pedidos para restaurantes com controle de comandas, estoque e relatórios.
 
-View your app in AI Studio: https://ai.studio/apps/865e3933-dad1-4c69-8a34-1b3f4adc9ab2
+## Funcionalidades
 
-## Run Locally
+- Cadastro e listagem de produtos e categorias
+- Abertura, edição e fechamento de comandas
+- Registro de pagamentos em dinheiro, cartão e Pix
+- Histórico de comandas com filtro por data, status e forma de pagamento
+- Controle automático de estoque e desativação de produtos sem saldo
+- Gestão de usuários e permissões
 
-**Prerequisites:**  Node.js
+## Executar localmente
 
+**Pré-requisito:** Node.js
 
-1. Install dependencies:
+1. Instale as dependências:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Configure as variáveis de ambiente em `.env.local`
+3. Inicie o projeto:
    `npm run dev`
