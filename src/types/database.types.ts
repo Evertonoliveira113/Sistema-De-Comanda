@@ -57,6 +57,10 @@ export type ComandaItem = {
   quantidade: number;
   preco_unitario: number;
   subtotal: number;
+  opcoes?: {
+    precisa_prato: boolean;
+    acompanhamentos: string[];
+  };
   created_at: string;
   produto?: Product;
 };

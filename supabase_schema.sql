@@ -16,6 +16,18 @@ CREATE TABLE IF NOT EXISTS categorias (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 2.1 Tabela de Acompanhamentos (modificadores gerenciáveis)
+CREATE TABLE IF NOT EXISTS acompanhamentos (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nome TEXT NOT NULL,
+  ativo BOOLEAN DEFAULT TRUE,
+  categoria_id UUID REFERENCES categorias(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Índice para rápido filtro por categoria e ativo
+CREATE INDEX IF NOT EXISTS idx_acompanhamentos_categoria_ativo ON acompanhamentos (categoria_id) WHERE (ativo = TRUE);
+
 -- 3. Tabela de Produtos
 CREATE TABLE IF NOT EXISTS produtos (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -61,6 +73,7 @@ CREATE TABLE IF NOT EXISTS comanda_itens (
   quantidade INTEGER NOT NULL DEFAULT 1,
   preco_unitario DECIMAL(10,2) NOT NULL,
   subtotal DECIMAL(10,2) NOT NULL,
+  opcoes JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

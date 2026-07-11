@@ -49,7 +49,13 @@ export const comandaService = {
     return Array.isArray(data) && data.length > 0;
   },
 
-  async addItem(comandaId: string, produtoId: string, quantidade: number, precoUnitario: number) {
+  async addItem(
+    comandaId: string,
+    produtoId: string,
+    quantidade: number,
+    precoUnitario: number,
+    opcoes?: { precisa_prato: boolean; acompanhamentos: string[] }
+  ) {
     // Verificar se o produto está ativo
     const { data: produto, error: produtoError } = await supabase
       .from('produtos')
@@ -63,12 +69,24 @@ export const comandaService = {
       throw new Error('Produto inativo');
     }
 
-    // Verificar se o produto já existe nesta comanda
+    // Normalizar opcoes (aceita qualquer lista enviada pelo front-end)
+    const normalizedOpcoes = opcoes ?? { precisa_prato: false, acompanhamentos: [] };
+
+    if (typeof normalizedOpcoes.precisa_prato !== 'boolean') {
+      throw new Error('Campo precisa_prato deve ser booleano');
+    }
+
+    if (!Array.isArray(normalizedOpcoes.acompanhamentos)) {
+      throw new Error('Campo acompanhamentos deve ser um array de strings');
+    }
+
+    // Verificar se o produto já existe nesta comanda com as mesmas opções (compara JSONB)
     const { data: existingItems, error: checkError } = await supabase
       .from('comanda_itens')
       .select('id, quantidade, preco_unitario')
       .eq('comanda_id', comandaId)
       .eq('produto_id', produtoId)
+      .eq('opcoes', normalizedOpcoes)
       .single();
     
     if (!checkError && existingItems) {
@@ -92,7 +110,8 @@ export const comandaService = {
           produto_id: produtoId,
           quantidade,
           preco_unitario: precoUnitario,
-          subtotal
+          subtotal,
+          opcoes: normalizedOpcoes
         }]);
       
       if (insertError) {

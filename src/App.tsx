@@ -100,6 +100,8 @@ export default function App() {
             </ProtectedRoute>
           } />
 
+          
+
           {/* Fallback */}
           <Route path="/" element={<RoleBasedRedirect />} />
         </Routes>

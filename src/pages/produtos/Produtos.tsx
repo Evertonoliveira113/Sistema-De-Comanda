@@ -9,6 +9,7 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { Plus, Search, Edit2, Trash2, Package, XCircle, Tags } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { acompanhamentoService } from '../../services/acompanhamentoService';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -26,6 +27,10 @@ export default function Produtos() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [selectedCategoryForAcompanhamentos, setSelectedCategoryForAcompanhamentos] = useState<string | null>(null);
+  const [acompanhamentosList, setAcompanhamentosList] = useState<any[]>([]);
+  const [loadingAcompanhamentos, setLoadingAcompanhamentos] = useState(false);
+  const [newAcompanhamentoName, setNewAcompanhamentoName] = useState('');
 
   const fetchData = async () => {
     try {
@@ -49,6 +54,28 @@ export default function Produtos() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategoryForAcompanhamentos) {
+      setSelectedCategoryForAcompanhamentos(categories[0].id);
+    }
+  }, [categories]);
+
+  useEffect(() => {
+    const fetchA = async () => {
+      if (!selectedCategoryForAcompanhamentos) return setAcompanhamentosList([]);
+      setLoadingAcompanhamentos(true);
+      try {
+        const data = await acompanhamentoService.getByCategoria(selectedCategoryForAcompanhamentos);
+        setAcompanhamentosList(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingAcompanhamentos(false);
+      }
+    };
+    fetchA();
+  }, [selectedCategoryForAcompanhamentos]);
 
   const handleDelete = async (product: Product) => {
     if (!confirm(`Tem certeza que deseja excluir "${product.nome}"?`)) return;
@@ -361,6 +388,87 @@ export default function Produtos() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Seção de Acompanhamentos (Admin) */}
+            <div className="bg-white rounded-[32px] border border-zinc-100 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-orange-50 p-3 rounded-2xl text-orange-600">
+                  <Tags size={20} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-zinc-900">Acompanhamentos</h2>
+                  <p className="text-sm text-zinc-500">Gerencie acompanhamentos por categoria.</p>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-sm font-bold text-zinc-500">Categoria</label>
+                <select
+                  value={selectedCategoryForAcompanhamentos || ''}
+                  onChange={e => setSelectedCategoryForAcompanhamentos(e.target.value)}
+                  className="w-full p-3 rounded-xl border bg-zinc-50 mt-2"
+                >
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newAcompanhamentoName || !selectedCategoryForAcompanhamentos) return;
+                try {
+                  await acompanhamentoService.create(newAcompanhamentoName, selectedCategoryForAcompanhamentos, true);
+                  setNewAcompanhamentoName('');
+                  const data = await acompanhamentoService.getByCategoria(selectedCategoryForAcompanhamentos);
+                  setAcompanhamentosList(data);
+                  alert('Acompanhamento criado');
+                } catch (err: any) {
+                  alert('Erro ao criar: ' + (err.message || ''));
+                }
+              }} className="mb-4">
+                <div className="flex gap-2">
+                  <input value={newAcompanhamentoName} onChange={e => setNewAcompanhamentoName(e.target.value)} placeholder="Novo acompanhamento" className="flex-1 p-3 rounded-xl border bg-zinc-50" />
+                  <Button type="submit">Adicionar</Button>
+                </div>
+              </form>
+
+              <div>
+                {loadingAcompanhamentos ? (
+                  <div>Carregando...</div>
+                ) : acompanhamentosList.length === 0 ? (
+                  <div className="text-zinc-400">Nenhum acompanhamento nesta categoria.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {acompanhamentosList.map(a => (
+                      <div key={a.id} className="flex items-center justify-between p-2 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${a.ativo ? 'bg-emerald-500' : 'bg-zinc-300'}`} />
+                          <div>{a.nome}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={async () => {
+                            try {
+                              await acompanhamentoService.update(a.id, { ativo: !a.ativo });
+                              const data = await acompanhamentoService.getByCategoria(selectedCategoryForAcompanhamentos!);
+                              setAcompanhamentosList(data);
+                            } catch (err: any) { alert('Erro ao atualizar: ' + (err.message || '')); }
+                          }} className="p-2 bg-zinc-50 rounded-lg">{a.ativo ? 'Inativar' : 'Ativar'}</button>
+                          <button onClick={async () => {
+                            if (!confirm(`Excluir \"${a.nome}\"?`)) return;
+                            try {
+                              await acompanhamentoService.remove(a.id);
+                              const data = await acompanhamentoService.getByCategoria(selectedCategoryForAcompanhamentos!);
+                              setAcompanhamentosList(data);
+                            } catch (err: any) { alert('Erro ao excluir: ' + (err.message || '')); }
+                          }} className="p-2 bg-red-50 text-red-600 rounded-lg"><Trash2 size={16} /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
