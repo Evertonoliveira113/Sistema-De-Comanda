@@ -11,7 +11,6 @@ import Comandas from './pages/comandas/Comandas';
 import ComandaAtiva from './pages/comandas/ComandaAtiva';
 import Historico from './pages/comandas/Historico';
 import Produtos from './pages/produtos/Produtos';
-import Categorias from './pages/categorias/Categorias';
 import Estoque from './pages/admin/Estoque';
 import Usuarios from './pages/admin/Usuarios';
 import Relatorios from './pages/admin/Relatorios';
