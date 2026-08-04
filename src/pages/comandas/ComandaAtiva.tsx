@@ -79,19 +79,23 @@ export default function ComandaAtiva() {
           <style>
             body { 
               font-family: 'Courier New', Courier, monospace; 
-              width: 80mm; 
+              width: 48mm;
+              max-width: 48mm;
               margin: 0; 
-              padding: 5mm;
-              font-size: 10pt;
+              padding: 2mm;
+              font-size: 8.5pt;
+              line-height: 1.2;
+              box-sizing: border-box;
             }
             .text-center { text-align: center; }
-            .flex { display: flex; justify-content: space-between; }
+            .flex { display: flex; justify-content: space-between; gap: 4px; }
             .border-b { border-bottom: 1px dashed black; }
             .border-t { border-top: 1px dashed black; }
-            .pb-2 { padding-bottom: 8px; }
-            .mb-2 { margin-bottom: 8px; }
-            .mt-4 { margin-top: 16px; }
+            .pb-2 { padding-bottom: 4px; }
+            .mb-2 { margin-bottom: 4px; }
+            .mt-4 { margin-top: 8px; }
             .font-bold { font-weight: bold; }
+            p, div { margin: 0 0 2px 0; }
           </style>
         </head>
         <body>
@@ -341,12 +345,15 @@ export default function ComandaAtiva() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 80mm;
-            padding: 5mm;
+            width: 48mm;
+            max-width: 48mm;
+            padding: 2mm;
             font-family: 'Courier New', Courier, monospace;
-            font-size: 12pt;
+            font-size: 8.5pt;
+            line-height: 1.2;
             color: black;
             background: white;
+            box-sizing: border-box;
           }
           .no-print { display: none !important; }
         }
