@@ -338,22 +338,37 @@ export default function ComandaAtiva() {
   return (
     <Layout>
       <style dangerouslySetInnerHTML={{ __html: `
+        @page {
+          size: 48mm auto;
+          margin: 0;
+        }
+
         @media print {
+          html, body {
+            width: 48mm;
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+
           body * { visibility: hidden; }
           #print-area, #print-area * { visibility: visible; }
           #print-area {
-            position: absolute;
+            position: fixed;
             left: 0;
             top: 0;
             width: 48mm;
             max-width: 48mm;
             padding: 2mm;
+            margin: 0;
             font-family: 'Courier New', Courier, monospace;
             font-size: 8.5pt;
             line-height: 1.2;
             color: black;
             background: white;
             box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .no-print { display: none !important; }
         }
